@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { AlertTriangle, Inbox, Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -51,6 +52,28 @@ export function ErrorState({ error, retry }) {
       </div>
     </div>
   );
+}
+
+export function Reveal({ children, delay = 0, className = '' }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    el.style.transitionDelay = `${delay}ms`;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.classList.add('reveal-in');
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.05, rootMargin: '0px 0px -20px 0px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [delay]);
+  return <div ref={ref} className={`reveal-elem${className ? ` ${className}` : ''}`}>{children}</div>;
 }
 
 export function LockedFeature({ title, price, children }) {

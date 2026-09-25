@@ -30,19 +30,38 @@ export function PageHeader({ title, subtitle, actions }) {
   );
 }
 
-export function StatCard({ label, value, hint, icon: Icon, tone = 'brand' }) {
+const ArrowUp = () => (
+  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+    <path d="M5 8V2M2 5l3-3 3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const ArrowDown = () => (
+  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+    <path d="M5 2v6M2 5l3 3 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+export function StatCard({ label, value, hint, icon: Icon, tone = 'brand', trend }) {
   return (
-    <div className="card flex items-start justify-between p-4">
-      <div className="min-w-0">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>
-        <p className="mt-1 truncate text-2xl font-semibold">{value}</p>
-        {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
+    <div className="stat-card-glass">
+      <div className="flex items-center justify-between">
+        <span className="stat-card-label">{label}</span>
+        {Icon && (
+          <span className={`stat-card-icon ${TONES[tone]}`}>
+            <Icon className="h-3.5 w-3.5" />
+          </span>
+        )}
       </div>
-      {Icon && (
-        <div className={`ml-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${TONES[tone]}`}>
-          <Icon className="h-4.5 w-4.5" />
-        </div>
-      )}
+      <p className="stat-card-num">{value}</p>
+      <div className="stat-card-foot">
+        {trend && (
+          <span className={`stat-delta ${trend.up ? 'stat-delta-up' : 'stat-delta-down'}`}>
+            {trend.up ? <ArrowUp /> : <ArrowDown />}
+            {trend.label}
+          </span>
+        )}
+        {hint && <span className="stat-card-sub">{hint}</span>}
+      </div>
     </div>
   );
 }
