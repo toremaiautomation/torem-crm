@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+:root {
+  --brand: #007ae3;
+  --brand-hover: #0088f5;
+}
+
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: color-mix(in srgb, var(--brand) 10%, white);
+  --color-brand-ring: color-mix(in srgb, var(--brand) 35%, white);
+}
+
+@theme {
+  --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
+
+  --color-navy: #0b1f3a;
+  --color-navy-2: #122847;
+  --color-navy-3: #16314f;
+  --color-ink: #0b1f3a;
+  --color-muted: #5c6e84;
+  --color-line: #d3e0f0;
+  --color-surface: #f7faff;
+  --color-surface-2: #eef6ff;
+  --color-surface-3: #f0f4f9;
+  --color-success: #34d399;
+  --color-success-ink: #047857;
+  --color-warning: #f59e0b;
+  --color-warning-ink: #b45309;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  body {
+    @apply bg-surface text-ink antialiased;
+  }
+  ::selection {
+    background: var(--color-brand-ring);
+  }
+}
+
+@utility card {
+  @apply rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(11,31,58,0.04)];
+}
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility btn-primary {
+  @apply btn bg-brand text-white hover:bg-brand-hover;
+}
+@utility btn-secondary {
+  @apply btn border border-line bg-white text-ink hover:bg-surface-3;
+}
+@utility btn-ghost {
+  @apply btn text-muted hover:bg-surface-3 hover:text-ink;
+}
+@utility btn-danger {
+  @apply btn border border-red-200 bg-danger-soft text-danger hover:bg-red-100;
+}
+@utility input {
+  @apply w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none placeholder:text-muted/70 focus:border-brand focus:ring-2 focus:ring-brand-ring;
+}
+@utility label {
+  @apply mb-1 block text-xs font-medium text-muted;
+}
