@@ -37,7 +37,7 @@ export default function FollowUps() {
       <>
         <PageHeader title="Follow-ups" />
         <LockedFeature title="Automated Follow-Up" price={addons.find((a) => a.addon_name === 'automated_followup')?.monthly_price}>
-          When a chat captures an email but doesn't end in a booking, Torem automatically follows up to bring the customer back — no manual chasing.
+          When a chat captures an email but doesn't end in a booking, Torem automatically follows up to bring the customer back. No manual chasing.
         </LockedFeature>
       </>
     );
