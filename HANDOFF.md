@@ -1,16 +1,18 @@
-# Torem AI — Technical handoff (dashboard, widget, n8n)
+# Torem AI — Technical handoff (dashboard ↔ n8n ↔ widget)
 
-Written 2026-09-19. Everything below is on the Windows PC under `C:\Users\klr13\`.
+Written 2026-09-19, corrected 2026-09-25 to match Eddy's multi-tenant widget.
 
 ## 1. What exists now
 
-| Folder | What it is | Status |
+| Where | What it is | Status |
 |---|---|---|
-| `torem-crm/` | Client dashboard + agency admin. Vite + React 19 + Tailwind v4. Reads Supabase directly (RLS-scoped). | **Working locally** against live Supabase. Not deployed. |
-| `torem-chat-widget/` | The chat bubble for contractor websites. Vite library build → `build/widget.js` + `build/widget.css`. | **Working locally.** Not hosted yet. |
-| `torem-website/` | toremai.com (Vercel, GitHub `toremaiautomation/torem-website`). | One local change not yet pushed (see §5). |
+| GitHub `toremaiautomation/torem-crm` | Client dashboard + agency admin. Vite + React 19 + Tailwind v4. Reads Supabase directly (RLS-scoped). | **Working locally** against live Supabase. Not deployed. |
+| `torem-website/public/widget.js` | **The** embeddable chat widget (Eddy, 2026-09-22): `data-client-id`, booking calendar, tested with Premier Roofing. | Live. Only the compiled bundle is in git — its source should be committed to `toremaiautomation/torem-chat-widget` (currently a stale January upload). |
+| GitHub `toremaiautomation/torem-website` | toremai.com (Vercel). Its own chat is `src/components/ChatWidget.jsx`. | Live. |
 
-Docs inside the repos: `torem-crm/README.md` (env, roles, n8n contracts), `torem-chat-widget/README.md` (embed snippet, attributes), `CLAUDE.md` at the top level (overview).
+A second widget built alongside the CRM was retired (local folder `torem-chat-widget-OLD-do-not-use`, never pushed) — ignore it.
+
+Docs: `torem-crm/README.md` (env, roles, dashboard ↔ n8n contracts).
 
 ## 2. Supabase — already done (don't redo)
 
@@ -33,17 +35,19 @@ Service-role key is still only used by n8n. The dashboard uses the publishable/a
 
 The dashboard never calls n8n. It reads Supabase rows and writes a few; n8n reacts to rows.
 
-### 3a. Chat workflow (`/webhook/torem-chat`) — required
-Request body now includes `client_id` (and `sessionId` + `session_id`, same value):
+### 3a. Chat workflow (`/webhook/torem-chat`) — what the dashboard needs from it
+The embeddable widget (`public/widget.js`) sends **camelCase** `clientId`:
 ```json
-{ "message": "...", "sessionId": "<uuid>", "session_id": "<uuid>", "client_id": "<clients.id>" }
+{ "message": "...", "sessionId": "<id>", "clientId": "<clients.id>" }
 ```
-- Write `client_id` onto every `chat_sessions` row. Without this, contractor chats never appear in their dashboard (rows with `client_id = null` are visible to admins only).
-- When the chat captures an email/phone → insert `leads (client_id, session_ref = sessionId, email, phone)`.
-- When a booking is confirmed → insert `bookings (client_id, session_ref, customer_name, customer_email, appointment_time, calendar_event_id, status = 'confirmed')` and set `leads.booking_completed = true`.
-- Reply field: the widget accepts `bot_message`, `ai_response`, `reply` or `message`.
+The dashboard only cares what lands in Supabase (snake_case columns):
+- Every `chat_sessions` row gets `client_id = clientId`. Without it, a contractor's chats never appear in their dashboard (rows with `client_id = null` are visible to admins only).
+- Email/phone captured → insert `leads (client_id, session_ref = sessionId, email, phone)`.
+- Booking confirmed → insert `bookings (client_id, session_ref, customer_name, customer_email, appointment_time, calendar_event_id, status = 'confirmed')` and set `leads.booking_completed = true`.
+- `session_ref` must equal the `sessionId` stored on `chat_sessions.session_id` — that's how the dashboard links a lead/booking back to its transcript.
+- **toremai.com's own chat** (`src/components/ChatWidget.jsx`) currently sends `{ message, sessionId }` with **no** `clientId`. Either default it to Torem (`d7b1ebe9-e914-4c39-891e-ee7617b74d3a`) in n8n, or add `clientId` to that request — otherwise Torem's own chats land with `client_id = null`.
 - The old endpoint `/webhook/8fbc92af-930e-40b8-95b2-dfe582c97a3e/chat` returns HTTP 500 — nothing points at it anymore; delete or fix.
-- Optional: load the client's `client_config.system_prompt` by `client_id` so each contractor's bot has its own persona (the admin edits it from the dashboard).
+- `client_config.system_prompt` is editable by admins from the dashboard (Clients → a client → AI system prompt). If "Get Client Config" reads it, those edits take effect.
 
 ### 3b. Follow-up workflow (cron) — for the "Automated Follow-Up" add-on
 Select `leads` where `followed_up_at is null and booking_completed = false and (email is not null or phone is not null) and created_at < now() - interval '<delay>'` and the client has `client_addons.addon_name = 'automated_followup' and enabled = true`. Send the follow-up, then set `followed_up_at = now()`. The dashboard shows Queued / Sent / Converted from these columns.
@@ -54,26 +58,23 @@ The dashboard's "Mark job complete" sets `bookings.status = 'completed'` and ins
 ### 3d. Cancellations — optional
 Dashboard sets `bookings.status = 'cancelled'`. If you want the Google Calendar event removed, watch for that and delete by `calendar_event_id`.
 
-## 4. Widget — hosting + embed
+## 4. Widget — embed (Eddy's widget)
 
-Build: `cd torem-chat-widget && npm install && npm run build` → `build/widget.js`, `build/widget.css`.
-Host `build/` as a static site (Vercel: new project, output directory `build`, or just drag the folder in). Suggested domain: `widget.toremai.com`.
+Served from toremai.com as `/widget.js`. It mounts into `#torem-chat` and reads these attributes (from the compiled bundle):
 
-Embed for a contractor (goes before `</body>` on their site):
-```html
-<link rel="stylesheet" href="https://widget.toremai.com/widget.css">
-<div id="torem-chat"
-     data-client-id="<their clients.id>"
-     data-name="Bayou City Roofing"
-     data-color="#B45309"
-     data-greeting="Hi! Need a quote or an inspection? I can help."></div>
-<script src="https://widget.toremai.com/widget.js" defer></script>
-```
-Optional `data-webhook` overrides the n8n URL. CSS is scoped to `.torem-widget` — it won't restyle the host site.
+| Attribute | Default |
+|---|---|
+| `data-client-id` | `""` — **must** be the business's `clients.id` so rows reach their dashboard |
+| `data-name`, `data-logo`, `data-color`, `data-nav-color`, `data-email`, `data-greeting` | branding / contact |
+| `data-booking` | on unless `"false"` |
+| `data-review-generation`, `data-lead-follow-up`, `data-crm-tracking` | off unless `"true"` |
+| `data-suggestions` | JSON array of starter questions |
 
-## 5. Website — one change to push
+Eddy owns the canonical embed snippet. For the dashboard, the only hard requirement is that `data-client-id` matches the `clients.id` of the business whose login should see those chats.
 
-`torem-website/src/App.jsx` `sendToN8N()` now sends `client_id: "d7b1ebe9-…"` (Torem's own id). Commit + push to GitHub; Vercel redeploys.
+## 5. Website
+
+Nothing pending from the CRM side. (An earlier `client_id` edit to the old single-file `App.jsx` was discarded — superseded by the multi-file rebuild.)
 
 ## 6. Dashboard — running and deploying
 
@@ -94,7 +95,7 @@ Roles: `admin` sees every client and the `/admin/clients` pages (edit plan, add-
    where user_id = (select id from auth.users where email = 'owner@contractor.com');
    ```
    (For Torem staff, also `role = 'admin'`.)
-4. **Embed the widget** on their website with their `data-client-id` (§4).
+4. **Embed the widget** on their website with `data-client-id` = their `clients.id` (§4).
 5. **Check** — send a test chat on their site; it should appear under their login in Conversations.
 
 ## 8. Known gaps / security notes
