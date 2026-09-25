@@ -9,7 +9,7 @@ import { attachRelations, computeStats, groupConversations, hourHistogram, perDa
 import { fmtNumber, fmtPercent, fmtRelative, labelFor, PLAN_LABELS } from '../lib/format';
 import { Badge, Card, DateRangePicker, PageHeader, StatCard, Table} from '../components/ui';
 import { useDateRange } from '../lib/useDateRange';
-import { EmptyState, ErrorState, Skeleton } from '../components/Feedback';
+import { EmptyState, ErrorState, Reveal, Skeleton } from '../components/Feedback';
 
 const tooltipStyle = { borderRadius: 8, border: '1px solid #d3e0f0', fontSize: 12 };
 
@@ -89,76 +89,82 @@ export default function Dashboard() {
           Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-24" />)
         ) : (
           <>
-            <StatCard label="Conversations" value={fmtNumber(model.stats.conversations)} hint={`${fmtNumber(model.stats.messages)} messages`} icon={MessageSquare} />
-            <StatCard label="Leads captured" value={fmtNumber(model.stats.leads)} hint={`${fmtPercent(model.stats.captureRate)} of conversations`} icon={Users} tone="success" />
-            <StatCard label="Bookings" value={fmtNumber(model.stats.bookings)} hint={`${fmtPercent(model.stats.bookingRate)} of leads`} icon={CalendarCheck} tone="navy" />
-            <StatCard label="Follow-ups sent" value={fmtNumber(model.stats.followUpsSent)} hint={`${fmtNumber(model.stats.followUpsPending)} pending`} icon={Repeat} tone="warning" />
-            <StatCard label="Reviews requested" value={fmtNumber(model.stats.reviewsRequested)} hint={`${fmtNumber(model.stats.reviewsSent)} sent`} icon={Star} />
-            <StatCard label="After hours" value={fmtPercent(model.stats.afterHoursPct)} hint="of chats outside 8am–6pm" icon={Moon} tone="neutral" />
+            <Reveal delay={0}><StatCard label="Conversations" value={fmtNumber(model.stats.conversations)} hint={`${fmtNumber(model.stats.messages)} messages`} icon={MessageSquare} /></Reveal>
+            <Reveal delay={70}><StatCard label="Leads captured" value={fmtNumber(model.stats.leads)} hint="of conversations" icon={Users} tone="success" trend={{ label: fmtPercent(model.stats.captureRate), up: true }} /></Reveal>
+            <Reveal delay={140}><StatCard label="Bookings" value={fmtNumber(model.stats.bookings)} hint="of leads" icon={CalendarCheck} tone="navy" trend={{ label: fmtPercent(model.stats.bookingRate), up: true }} /></Reveal>
+            <Reveal delay={210}><StatCard label="Follow-ups sent" value={fmtNumber(model.stats.followUpsSent)} hint={`${fmtNumber(model.stats.followUpsPending)} pending`} icon={Repeat} tone="warning" /></Reveal>
+            <Reveal delay={280}><StatCard label="Reviews requested" value={fmtNumber(model.stats.reviewsRequested)} hint={`${fmtNumber(model.stats.reviewsSent)} sent`} icon={Star} /></Reveal>
+            <Reveal delay={350}><StatCard label="After hours" value={fmtPercent(model.stats.afterHoursPct)} hint="outside 8am–6pm" icon={Moon} tone="neutral" /></Reveal>
           </>
         )}
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        <Card title="Conversations per day" subtitle="Leads captured shown underneath" className="lg:col-span-2" bodyClassName="p-4">
-          {model ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <AreaChart data={model.perDay} margin={{ left: -20, right: 8, top: 8 }}>
-                <defs>
-                  <linearGradient id="conv" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--brand)" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="var(--brand)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid vertical={false} stroke="#eef2f7" />
-                <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#5c6e84' }} interval="preserveStartEnd" />
-                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#5c6e84' }} allowDecimals={false} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Area type="monotone" dataKey="conversations" stroke="var(--brand)" strokeWidth={2} fill="url(#conv)" isAnimationActive={false} />
-                <Area type="monotone" dataKey="leads" stroke="#34d399" strokeWidth={2} fill="transparent" isAnimationActive={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <Skeleton className="h-60" />
-          )}
-        </Card>
+        <Reveal delay={0} className="lg:col-span-2">
+          <Card title="Conversations per day" subtitle="Leads captured shown underneath" bodyClassName="p-4">
+            {model ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <AreaChart data={model.perDay} margin={{ left: -20, right: 8, top: 8 }}>
+                  <defs>
+                    <linearGradient id="conv" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--brand)" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="var(--brand)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid vertical={false} stroke="#eef2f7" />
+                  <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#5c6e84' }} interval="preserveStartEnd" />
+                  <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#5c6e84' }} allowDecimals={false} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Area type="monotone" dataKey="conversations" stroke="var(--brand)" strokeWidth={2} fill="url(#conv)" isAnimationActive={false} />
+                  <Area type="monotone" dataKey="leads" stroke="#34d399" strokeWidth={2} fill="transparent" isAnimationActive={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <Skeleton className="h-60" />
+            )}
+          </Card>
+        </Reveal>
 
-        <Card title="When customers reach out" subtitle="Chats by hour of day" bodyClassName="p-4">
-          {model ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={model.hours} margin={{ left: -20, right: 8, top: 8 }}>
-                <CartesianGrid vertical={false} stroke="#eef2f7" />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#5c6e84' }} interval={3} />
-                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#5c6e84' }} allowDecimals={false} />
-                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#f0f4f9' }} />
-                <Bar dataKey="count" name="Chats" fill="#0b1f3a" radius={[4, 4, 0, 0]} isAnimationActive={false} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <Skeleton className="h-60" />
-          )}
-        </Card>
+        <Reveal delay={70}>
+          <Card title="When customers reach out" subtitle="Chats by hour of day" bodyClassName="p-4">
+            {model ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={model.hours} margin={{ left: -20, right: 8, top: 8 }}>
+                  <CartesianGrid vertical={false} stroke="#eef2f7" />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#5c6e84' }} interval={3} />
+                  <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#5c6e84' }} allowDecimals={false} />
+                  <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#f0f4f9' }} />
+                  <Bar dataKey="count" name="Chats" fill="#0b1f3a" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <Skeleton className="h-60" />
+            )}
+          </Card>
+        </Reveal>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <Card title="Leads vs bookings" subtitle="Per week" bodyClassName="p-4">
-          {model ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={model.perWeek} margin={{ left: -20, right: 8, top: 8 }}>
-                <CartesianGrid vertical={false} stroke="#eef2f7" />
-                <XAxis dataKey="week" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#5c6e84' }} />
-                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#5c6e84' }} allowDecimals={false} />
-                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#f0f4f9' }} />
-                <Bar dataKey="leads" fill="var(--brand)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
-                <Bar dataKey="bookings" fill="#34d399" radius={[4, 4, 0, 0]} isAnimationActive={false} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <Skeleton className="h-52" />
-          )}
-        </Card>
+        <Reveal delay={0}>
+          <Card title="Leads vs bookings" subtitle="Per week" bodyClassName="p-4">
+            {model ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={model.perWeek} margin={{ left: -20, right: 8, top: 8 }}>
+                  <CartesianGrid vertical={false} stroke="#eef2f7" />
+                  <XAxis dataKey="week" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#5c6e84' }} />
+                  <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#5c6e84' }} allowDecimals={false} />
+                  <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#f0f4f9' }} />
+                  <Bar dataKey="leads" fill="var(--brand)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="bookings" fill="#34d399" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <Skeleton className="h-52" />
+            )}
+          </Card>
+        </Reveal>
 
-        <Card
+        <Reveal delay={70} className="lg:col-span-2"><Card
           title={isAdmin && !activeClientId ? 'By client' : 'Recent conversations'}
           className="lg:col-span-2"
           actions={
@@ -203,7 +209,7 @@ export default function Dashboard() {
               ]}
             />
           )}
-        </Card>
+        </Card></Reveal>
       </div>
     </>
   );

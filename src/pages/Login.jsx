@@ -100,31 +100,46 @@ export default function Login() {
   if (!loading && user) return <Navigate to={location.state?.from?.pathname ?? '/'} replace />;
 
   return (
-    <div className="flex min-h-screen">
-      <div className="hidden w-1/2 flex-col justify-between bg-navy p-10 text-white lg:flex">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand text-lg font-bold">T</span>
-          <span className="text-lg font-semibold">Torem AI</span>
-        </div>
-        <div>
-          <h1 className="text-3xl font-semibold leading-tight">Never miss another customer inquiry.</h1>
-          <p className="mt-3 max-w-md text-white/70">
-            Every conversation, lead, and booking your AI assistant captures — in one place.
-          </p>
-        </div>
-        <p className="text-xs text-white/40">© {new Date().getFullYear()} Torem AI · Houston, TX</p>
+    <div className="login-page-root">
+      {/* Ambient blobs */}
+      <div className="login-blobs" aria-hidden="true">
+        <div className="login-blob login-blob-a" />
+        <div className="login-blob login-blob-b" />
+        <div className="login-blob login-blob-c" />
       </div>
-      <div className="flex flex-1 items-center justify-center p-6">
-        <div className="w-full max-w-sm">
-          <div className="mb-6 flex items-center gap-3 lg:hidden">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand text-lg font-bold text-white">T</span>
-            <span className="text-lg font-semibold">Torem AI</span>
+
+      <div className="login-wrap">
+        <div className="login-grid">
+
+          {/* ── Left: brand panel ── */}
+          <div className="login-copy">
+            <div className="login-brand">
+              <span className="login-mark">T</span>
+              <span>Torem AI</span>
+            </div>
+            <h1>Never miss another customer inquiry.</h1>
+            <p>Every conversation, lead, and booking your AI assistant captures — in one place.</p>
+            <div className="login-stats">
+              <div><strong>24/7</strong><span>Always answering</span></div>
+              <div><strong>2–5 days</strong><span>To go live</span></div>
+              <div><strong>$0</strong><span>Setup fee</span></div>
+            </div>
           </div>
-          <h2 className="text-xl font-semibold">Sign in to your dashboard</h2>
-          <p className="mt-1 mb-6 text-sm text-muted">
-            {IS_MOCK ? 'Demo mode — pick an account to explore with sample data.' : 'Use the email Torem set up for your business.'}
-          </p>
-          {IS_MOCK ? <DemoAccounts /> : <RealLogin />}
+
+          {/* ── Right: glass form panel ── */}
+          <div className="login-form-side">
+            {/* Mobile logo — hidden on lg+ (left panel covers it) */}
+            <div className="mb-6 flex items-center gap-3 lg:hidden">
+              <span className="login-mark login-mark-blue">T</span>
+              <span className="text-base font-semibold text-ink">Torem AI</span>
+            </div>
+            <h2>Sign in to your dashboard</h2>
+            <p className="login-form-sub">
+              {IS_MOCK ? 'Demo mode — pick an account to explore.' : 'Use the email Torem set up for your business.'}
+            </p>
+            {IS_MOCK ? <DemoAccounts /> : <RealLogin />}
+          </div>
+
         </div>
       </div>
     </div>
