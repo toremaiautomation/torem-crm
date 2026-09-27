@@ -114,9 +114,9 @@ export default function Login() {
           {/* ── Left: brand panel ── */}
           <div className="login-copy">
             <img
-              src="https://app.toremai.com/torem-logo.png"
+              src="https://app.toremai.com/torem-logo-white.png"
               alt="Torem AI"
-              style={{ height: '72px', width: 'auto', objectFit: 'contain' }}
+              style={{ height: '180px', width: 'auto', objectFit: 'contain' }}
             />
             <h1>Never miss another customer inquiry.</h1>
             <p>Every conversation, lead, and booking your AI assistant captures — in one place.</p>
@@ -134,7 +134,7 @@ export default function Login() {
               <img
                 src="https://app.toremai.com/torem-logo.png"
                 alt="Torem AI"
-                style={{ height: '56px', width: 'auto', objectFit: 'contain' }}
+                style={{ height: '140px', width: 'auto', objectFit: 'contain' }}
               />
             </div>
             <h2>Sign in to your dashboard</h2>
