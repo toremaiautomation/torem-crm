@@ -113,10 +113,11 @@ export default function Login() {
 
           {/* ── Left: brand panel ── */}
           <div className="login-copy">
-            <div className="login-brand">
-              <img src="https://app.toremai.com/torem-logo.png" alt="Torem AI" className="login-mark" style={{ objectFit: 'contain' }} />
-              <span>Torem AI</span>
-            </div>
+            <img
+              src="https://app.toremai.com/torem-logo.png"
+              alt="Torem AI"
+              style={{ height: '72px', width: 'auto', objectFit: 'contain' }}
+            />
             <h1>Never miss another customer inquiry.</h1>
             <p>Every conversation, lead, and booking your AI assistant captures — in one place.</p>
             <div className="login-stats">
@@ -129,9 +130,12 @@ export default function Login() {
           {/* ── Right: glass form panel ── */}
           <div className="login-form-side">
             {/* Mobile logo — hidden on lg+ (left panel covers it) */}
-            <div className="mb-6 flex items-center gap-3 lg:hidden">
-              <img src="https://app.toremai.com/torem-logo.png" alt="Torem AI" className="login-mark login-mark-blue" style={{ objectFit: 'contain' }} />
-              <span className="text-base font-semibold text-ink">Torem AI</span>
+            <div className="mb-6 lg:hidden">
+              <img
+                src="https://app.toremai.com/torem-logo.png"
+                alt="Torem AI"
+                style={{ height: '56px', width: 'auto', objectFit: 'contain' }}
+              />
             </div>
             <h2>Sign in to your dashboard</h2>
             <p className="login-form-sub">
