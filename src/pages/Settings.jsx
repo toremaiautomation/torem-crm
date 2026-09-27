@@ -5,7 +5,7 @@ import { useAuth } from '../auth/context';
 import { useClient, useIntegrations, useUpdateClientConfig } from '../data/queries';
 import { ADDON_LABELS, fmtDate, fmtMoney, labelFor, PLAN_LABELS } from '../lib/format';
 import { Badge, Card, Field, PageHeader, Toggle } from '../components/ui';
-import { EmptyState, ErrorState, Skeleton } from '../components/Feedback';
+import { EmptyState, ErrorState, Skeleton, Spinner } from '../components/Feedback';
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const DEFAULT_DAY = { open: '09:00', close: '17:00' };
@@ -134,7 +134,33 @@ export function HoursForm({ clientId, config }) {
 }
 
 export function PlanCard({ client, addons }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
   const monthly = addons.filter((a) => a.enabled).reduce((n, a) => n + Number(a.monthly_price ?? 0), 0);
+
+  async function openPortal() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch('https://toremai.app.n8n.cloud/webhook/billing-portal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': import.meta.env.VITE_N8N_ONBOARD_SECRET,
+        },
+        body: JSON.stringify({ client_id: client.id }),
+      });
+      if (!res.ok) throw new Error(`Webhook returned ${res.status}`);
+      const json = await res.json();
+      if (!json.portal_url) throw new Error('No portal_url in response');
+      window.open(json.portal_url, '_blank', 'noopener,noreferrer');
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <Card title="Your plan" subtitle="Managed by Torem — email us to change anything">
       <div className="p-4">
@@ -160,6 +186,15 @@ export function PlanCard({ client, addons }) {
           })}
         </ul>
         <p className="mt-3 text-right text-xs text-muted">Add-ons: <span className="font-medium text-ink">{fmtMoney(monthly)}/mo</span></p>
+        {client.billing_status === 'active' && (
+          <div className="mt-4 border-t border-line pt-4">
+            <button className="btn-secondary w-full" onClick={openPortal} disabled={busy}>
+              {busy && <Spinner className="h-4 w-4" />}
+              Manage Subscription
+            </button>
+            {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+          </div>
+        )}
       </div>
     </Card>
   );
