@@ -3,7 +3,7 @@ import { useAuth } from '../auth/context';
 import { useClient } from '../data/queries';
 import { ThemeContext } from './context';
 
-const DEFAULT_BRAND = { primary: '#007AE3', name: 'Torem AI', logoUrl: '' };
+const DEFAULT_BRAND = { primary: '#007AE3', name: 'Torem AI', logoUrl: 'https://app.toremai.com/torem-logo.png' };
 
 function hoverFor(hex) {
   return `color-mix(in srgb, ${hex} 88%, white)`;
