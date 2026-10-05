@@ -14,6 +14,8 @@ import FollowUps from './pages/FollowUps';
 import Reviews from './pages/Reviews';
 import Settings from './pages/Settings';
 import Billing from './pages/Billing';
+import BillingSuccess from './pages/BillingSuccess';
+import BillingCancelled from './pages/BillingCancelled';
 import Clients from './pages/admin/Clients';
 import ClientDetail from './pages/admin/ClientDetail';
 
@@ -55,6 +57,8 @@ export default function App() {
           <Route path="reviews" element={<Reviews />} />
           <Route path="settings" element={<Settings />} />
           <Route path="billing" element={<Billing />} />
+          <Route path="billing-success" element={<BillingSuccess />} />
+          <Route path="billing-cancelled" element={<BillingCancelled />} />
           <Route element={<RequireAdmin />}>
             <Route path="admin/clients" element={<Clients />} />
             <Route path="admin/clients/:clientId" element={<ClientDetail />} />
