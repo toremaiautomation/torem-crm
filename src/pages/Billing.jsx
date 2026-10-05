@@ -1,0 +1,185 @@
+import { useState } from 'react';
+import { useAuth } from '../auth/context';
+import { useClient, useSetAddon } from '../data/queries';
+import { supabase } from '../lib/supabase';
+import { ADDON_LABELS, fmtMoney, labelFor, PLAN_LABELS } from '../lib/format';
+import { Badge, Card, PageHeader, Toggle } from '../components/ui';
+import { ErrorState, Skeleton, Spinner } from '../components/Feedback';
+
+// Set VITE_N8N_SUBSCRIBE_WEBHOOK in .env.local and Vercel env vars
+// to your production n8n webhook path, e.g.:
+// VITE_N8N_SUBSCRIBE_WEBHOOK=https://toremai.app.n8n.cloud/webhook/create-checkout
+const SUBSCRIBE_WEBHOOK = import.meta.env.VITE_N8N_SUBSCRIBE_WEBHOOK;
+
+const PLAN_PRICE = { foundation: 40, growth: 0, full_stack: 0 };
+
+const ADDON_CONFIG = {
+  booking:            { price: 20, live: true },
+  review_generation:  { price: 10, live: false },
+  automated_followup: { price: 15, live: false },
+};
+
+const BILLING_BADGE = { active: 'success', pending: 'neutral', past_due: 'danger', canceled: 'danger' };
+const BILLING_LABEL = { active: 'Active', pending: 'Pending', past_due: 'Past due', canceled: 'Canceled' };
+
+export default function Billing() {
+  const { activeClientId } = useAuth();
+  const { data, isPending, error } = useClient(activeClientId);
+  const setAddon = useSetAddon();
+  const [busy, setBusy] = useState(false);
+  const [subError, setSubError] = useState(null);
+  const [portalBusy, setPortalBusy] = useState(false);
+  const [portalError, setPortalError] = useState(null);
+
+  if (!activeClientId) return null;
+  if (isPending || !data) return <Skeleton className="h-96" />;
+  if (error) return <ErrorState error={error} />;
+
+  const { client, addons } = data;
+  const billingStatus = client.billing_status ?? 'pending';
+  const isActive = billingStatus === 'active';
+  const planPrice = PLAN_PRICE[client.plan_tier] ?? 0;
+  const addonTotal = Object.keys(ADDON_CONFIG).reduce((sum, name) => {
+    const row = addons.find((a) => a.addon_name === name);
+    return row?.enabled ? sum + ADDON_CONFIG[name].price : sum;
+  }, 0);
+
+  async function subscribe() {
+    setBusy(true);
+    setSubError(null);
+    try {
+      const { data: sd } = await supabase.auth.getSession();
+      const token = sd?.session?.access_token;
+      if (!token) throw new Error('Not authenticated — please sign in again.');
+      const res = await fetch(SUBSCRIBE_WEBHOOK, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401) throw new Error('Authentication failed — please sign in again.');
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const json = await res.json();
+      if (!json.checkout_url) throw new Error('No checkout URL in response');
+      window.location.href = json.checkout_url;
+    } catch (e) {
+      setSubError(e.message);
+      setBusy(false);
+    }
+  }
+
+  // Reuses same logic as PlanCard in Settings.jsx
+  async function openPortal() {
+    setPortalBusy(true);
+    setPortalError(null);
+    try {
+      const res = await fetch('https://toremai.app.n8n.cloud/webhook/billing-portal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': import.meta.env.VITE_N8N_ONBOARD_SECRET,
+        },
+        body: JSON.stringify({ client_id: client.id }),
+      });
+      if (!res.ok) throw new Error(`Webhook returned ${res.status}`);
+      const json = await res.json();
+      if (!json.portal_url) throw new Error('No portal_url in response');
+      window.open(json.portal_url, '_blank', 'noopener,noreferrer');
+    } catch (e) {
+      setPortalError(e.message);
+    } finally {
+      setPortalBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <PageHeader title="Billing" subtitle="Manage your subscription and add-ons." />
+      <div className="mx-auto max-w-xl space-y-4">
+
+        <Card title="Current plan">
+          <div className="flex items-center justify-between p-4">
+            <div>
+              <p className="text-lg font-semibold">{labelFor(PLAN_LABELS, client.plan_tier)} Plan</p>
+              <p className="mt-0.5 text-sm text-muted">{fmtMoney(planPrice)}/mo base</p>
+            </div>
+            <Badge tone={BILLING_BADGE[billingStatus] ?? 'neutral'}>
+              {BILLING_LABEL[billingStatus] ?? billingStatus}
+            </Badge>
+          </div>
+        </Card>
+
+        <Card
+          title="Add-ons"
+          subtitle={isActive ? 'Features active on your plan' : 'Select which features to include'}
+        >
+          <ul className="divide-y divide-line">
+            {Object.keys(ADDON_CONFIG).map((name) => {
+              const cfg = ADDON_CONFIG[name];
+              const row = addons.find((a) => a.addon_name === name);
+              const enabled = !!row?.enabled;
+
+              return (
+                <li key={name} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                  <div>
+                    <span className={`font-medium ${!cfg.live ? 'text-muted' : ''}`}>
+                      {ADDON_LABELS[name]}
+                    </span>
+                    {!cfg.live && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-medium text-muted">
+                        Coming soon
+                      </span>
+                    )}
+                    <p className="text-xs text-muted">+{fmtMoney(cfg.price)}/mo</p>
+                  </div>
+                  {isActive ? (
+                    <Badge tone={enabled ? 'success' : 'neutral'}>{enabled ? 'On' : 'Off'}</Badge>
+                  ) : (
+                    <Toggle
+                      checked={enabled}
+                      disabled={!cfg.live || setAddon.isPending}
+                      onChange={(on) =>
+                        cfg.live &&
+                        setAddon.mutate({ clientId: activeClientId, addonName: name, enabled: on, monthlyPrice: cfg.price })
+                      }
+                    />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="border-t border-line px-4 py-4">
+            <div className="flex items-center justify-between text-sm font-semibold">
+              <span>Monthly total</span>
+              <span>{fmtMoney(planPrice + addonTotal)}/mo</span>
+            </div>
+
+            {!isActive && (
+              <div className="mt-3">
+                <button className="btn-primary w-full" onClick={subscribe} disabled={busy}>
+                  {busy && <Spinner className="border-white/40 border-t-white" />}
+                  Subscribe
+                </button>
+                {subError && (
+                  <p className="mt-2 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{subError}</p>
+                )}
+              </div>
+            )}
+
+            {isActive && (
+              <div className="mt-3">
+                <button className="btn-secondary w-full" onClick={openPortal} disabled={portalBusy}>
+                  {portalBusy && <Spinner className="h-4 w-4" />}
+                  Manage Billing
+                </button>
+                {portalError && (
+                  <p className="mt-2 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{portalError}</p>
+                )}
+              </div>
+            )}
+          </div>
+        </Card>
+
+      </div>
+    </>
+  );
+}

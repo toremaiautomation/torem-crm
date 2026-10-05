@@ -4,6 +4,7 @@ import {
   Building2,
   CalendarDays,
   ChevronDown,
+  CreditCard,
   LayoutDashboard,
   Lock,
   LogOut,
@@ -28,6 +29,7 @@ const NAV = [
   { to: '/bookings', label: 'Bookings', icon: CalendarDays, addon: 'booking' },
   { to: '/follow-ups', label: 'Follow-ups', icon: Repeat, addon: 'automated_followup' },
   { to: '/reviews', label: 'Reviews', icon: Star, addon: 'review_generation' },
+  { to: '/billing', label: 'Billing', icon: CreditCard, clientOnly: true },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -60,7 +62,7 @@ function Nav({ onNavigate }) {
 
   return (
     <nav className="flex flex-1 flex-col gap-1">
-      {NAV.map(({ to, label, icon: Icon, end, addon }) => (
+      {NAV.filter(({ clientOnly }) => !clientOnly || !isAdmin).map(({ to, label, icon: Icon, end, addon }) => (
         <NavLink key={to} to={to} end={end} className={link} onClick={onNavigate}>
           <Icon className="h-4 w-4" />
           <span className="flex-1">{label}</span>

@@ -162,7 +162,7 @@ export function PlanCard({ client, addons }) {
   }
 
   return (
-    <Card title="Your plan" subtitle="Managed by Torem — email us to change anything">
+    <Card title="Your plan" subtitle="Update payment info below, or email us to change your plan">
       <div className="p-4">
         <div className="flex items-center justify-between">
           <div>
