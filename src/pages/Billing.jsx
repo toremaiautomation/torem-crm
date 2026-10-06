@@ -98,18 +98,19 @@ export default function Billing() {
     }
   }
 
-  // Reuses same logic as PlanCard in Settings.jsx
   async function openPortal() {
     setPortalBusy(true);
     setPortalError(null);
     try {
+      const { data: sd } = await supabase.auth.getSession();
+      const token = sd?.session?.access_token;
+      if (!token) throw new Error('Not authenticated — please sign in again.');
       const res = await fetch('https://toremai.app.n8n.cloud/webhook/billing-portal', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': import.meta.env.VITE_N8N_ONBOARD_SECRET,
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ client_id: client.id }),
       });
       if (!res.ok) throw new Error(`Webhook returned ${res.status}`);
       const json = await res.json();

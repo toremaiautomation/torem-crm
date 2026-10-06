@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarCheck, Palette } from 'lucide-react';
 import { useAuth } from '../auth/context';
+import { supabase } from '../lib/supabase';
 import { useClient, useIntegrations, useUpdateClientConfig } from '../data/queries';
 import { ADDON_LABELS, fmtDate, fmtMoney, labelFor, PLAN_LABELS } from '../lib/format';
 import { Badge, Card, Field, PageHeader, Toggle } from '../components/ui';
@@ -142,13 +143,15 @@ export function PlanCard({ client, addons }) {
     setBusy(true);
     setError(null);
     try {
+      const { data: sd } = await supabase.auth.getSession();
+      const token = sd?.session?.access_token;
+      if (!token) throw new Error('Not authenticated — please sign in again.');
       const res = await fetch('https://toremai.app.n8n.cloud/webhook/billing-portal', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': import.meta.env.VITE_N8N_ONBOARD_SECRET,
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ client_id: client.id }),
       });
       if (!res.ok) throw new Error(`Webhook returned ${res.status}`);
       const json = await res.json();
