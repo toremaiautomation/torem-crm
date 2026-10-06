@@ -6,10 +6,8 @@ import { ADDON_LABELS, fmtMoney, labelFor, PLAN_LABELS } from '../lib/format';
 import { Badge, Card, PageHeader, Toggle } from '../components/ui';
 import { ErrorState, Skeleton, Spinner } from '../components/Feedback';
 
-// Set VITE_N8N_SUBSCRIBE_WEBHOOK in .env.local and Vercel env vars
-// to your production n8n webhook path, e.g.:
-// VITE_N8N_SUBSCRIBE_WEBHOOK=https://toremai.app.n8n.cloud/webhook/create-checkout
 const SUBSCRIBE_WEBHOOK = import.meta.env.VITE_N8N_SUBSCRIBE_WEBHOOK;
+const ADDON_REQUEST_WEBHOOK = import.meta.env.VITE_N8N_ADDON_REQUEST_WEBHOOK;
 
 const PLAN_PRICE = { foundation: 40, growth: 0, full_stack: 0 };
 
@@ -22,6 +20,13 @@ const ADDON_CONFIG = {
 const BILLING_BADGE = { active: 'success', pending: 'neutral', past_due: 'danger', canceled: 'danger' };
 const BILLING_LABEL = { active: 'Active', pending: 'Pending', past_due: 'Past due', canceled: 'Canceled' };
 
+const REQUEST_ROWS = [
+  { name: 'booking',            label: 'Booking Built In',    comingSoon: false },
+  { name: 'review_generation',  label: 'Review Generation',   comingSoon: true  },
+  { name: 'automated_followup', label: 'Automated Follow-Up', comingSoon: true  },
+  { name: 'custom',             label: 'Something custom',    comingSoon: false },
+];
+
 export default function Billing() {
   const { activeClientId } = useAuth();
   const { data, isPending, error } = useClient(activeClientId);
@@ -30,6 +35,8 @@ export default function Billing() {
   const [subError, setSubError] = useState(null);
   const [portalBusy, setPortalBusy] = useState(false);
   const [portalError, setPortalError] = useState(null);
+  const [note, setNote] = useState('');
+  const [reqState, setReqState] = useState({});
 
   if (!activeClientId) return null;
   if (isPending || !data) return <Skeleton className="h-96" />;
@@ -63,6 +70,31 @@ export default function Billing() {
     } catch (e) {
       setSubError(e.message);
       setBusy(false);
+    }
+  }
+
+  async function sendRequest(addon) {
+    setReqState((s) => ({ ...s, [addon]: 'busy' }));
+    if (!ADDON_REQUEST_WEBHOOK) {
+      setReqState((s) => ({ ...s, [addon]: 'error' }));
+      return;
+    }
+    try {
+      const { data: sd } = await supabase.auth.getSession();
+      const token = sd?.session?.access_token;
+      if (!token) throw new Error('Not authenticated');
+      const res = await fetch(ADDON_REQUEST_WEBHOOK, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ addon, note: note.trim() }),
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      setReqState((s) => ({ ...s, [addon]: 'sent' }));
+    } catch {
+      setReqState((s) => ({ ...s, [addon]: 'error' }));
     }
   }
 
@@ -178,6 +210,62 @@ export default function Billing() {
             )}
           </div>
         </Card>
+
+        {isActive && (
+          <Card title="Want to add something?" subtitle="Tell us what you need and we will set it up for you.">
+            <div className="px-4 pt-4">
+              <p className="label mb-1">Anything specific we should know? <span className="text-muted font-normal">(optional)</span></p>
+              <textarea
+                className="input min-h-[72px] w-full resize-none"
+                maxLength={500}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Any details that might help us get it right..."
+              />
+              <p className="mt-1 text-right text-[11px] text-muted">{note.length}/500</p>
+            </div>
+            <ul className="mt-2 divide-y divide-line">
+              {REQUEST_ROWS.map(({ name, label, comingSoon }) => {
+                const alreadyEnabled = name !== 'custom' && addons.find((a) => a.addon_name === name)?.enabled;
+                const rs = reqState[name] ?? 'idle';
+                return (
+                  <li key={name} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                    <div>
+                      <span className="font-medium">{label}</span>
+                      {comingSoon && (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-medium text-muted">
+                          Coming soon
+                        </span>
+                      )}
+                      {rs === 'sent' && (
+                        <p className="mt-0.5 text-xs text-success-ink">Request sent — we'll be in touch.</p>
+                      )}
+                      {rs === 'error' && (
+                        <p className="mt-0.5 text-xs text-danger">Could not send your request. Please try again or email us.</p>
+                      )}
+                    </div>
+                    <div className="shrink-0">
+                      {alreadyEnabled ? (
+                        <Badge tone="success">Active</Badge>
+                      ) : rs === 'sent' ? (
+                        <Badge tone="neutral">Request sent</Badge>
+                      ) : (
+                        <button
+                          className="btn-secondary"
+                          disabled={rs === 'busy'}
+                          onClick={() => sendRequest(name)}
+                        >
+                          {rs === 'busy' && <Spinner className="h-3.5 w-3.5" />}
+                          {comingSoon ? 'Join waitlist' : 'Request'}
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        )}
 
       </div>
     </>
