@@ -189,7 +189,7 @@ export function PlanCard({ client, addons }) {
           })}
         </ul>
         <p className="mt-3 text-right text-xs text-muted">Add-ons: <span className="font-medium text-ink">{fmtMoney(monthly)}/mo</span></p>
-        {client.billing_status === 'active' && (
+        {client.billing_status === 'active' && !client.billing_exempt && (
           <div className="mt-4 border-t border-line pt-4">
             <button className="btn-secondary w-full" onClick={openPortal} disabled={busy}>
               {busy && <Spinner className="h-4 w-4" />}

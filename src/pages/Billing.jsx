@@ -45,6 +45,7 @@ export default function Billing() {
   const { client, addons } = data;
   const billingStatus = client.billing_status ?? 'pending';
   const isActive = billingStatus === 'active';
+  const isExempt = !!client.billing_exempt;
   const planPrice = PLAN_PRICE[client.plan_tier] ?? 0;
   const addonTotal = Object.keys(ADDON_CONFIG).reduce((sum, name) => {
     const row = addons.find((a) => a.addon_name === name);
@@ -134,85 +135,109 @@ export default function Billing() {
               <p className="text-lg font-semibold">{labelFor(PLAN_LABELS, client.plan_tier)} Plan</p>
               <p className="mt-0.5 text-sm text-muted">{fmtMoney(planPrice)}/mo base</p>
             </div>
-            <Badge tone={BILLING_BADGE[billingStatus] ?? 'neutral'}>
-              {BILLING_LABEL[billingStatus] ?? billingStatus}
-            </Badge>
+            {isExempt ? (
+              <Badge tone="success">Complimentary</Badge>
+            ) : (
+              <Badge tone={BILLING_BADGE[billingStatus] ?? 'neutral'}>
+                {BILLING_LABEL[billingStatus] ?? billingStatus}
+              </Badge>
+            )}
           </div>
         </Card>
 
-        <Card
-          title="Add-ons"
-          subtitle={isActive ? 'Features active on your plan' : 'Select which features to include'}
-        >
-          <ul className="divide-y divide-line">
-            {Object.keys(ADDON_CONFIG).map((name) => {
-              const cfg = ADDON_CONFIG[name];
-              const row = addons.find((a) => a.addon_name === name);
-              const enabled = !!row?.enabled;
-
-              return (
-                <li key={name} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                  <div>
-                    <span className={`font-medium ${!cfg.live ? 'text-muted' : ''}`}>
-                      {ADDON_LABELS[name]}
-                    </span>
-                    {!cfg.live && (
-                      <span className="ml-2 inline-flex items-center rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-medium text-muted">
-                        Coming soon
-                      </span>
-                    )}
-                    <p className="text-xs text-muted">+{fmtMoney(cfg.price)}/mo</p>
-                  </div>
-                  {isActive ? (
+        {isExempt ? (
+          <Card title="Add-ons" subtitle="Enabled on your account by Torem">
+            <ul className="divide-y divide-line">
+              {Object.keys(ADDON_CONFIG).map((name) => {
+                const row = addons.find((a) => a.addon_name === name);
+                const enabled = !!row?.enabled;
+                return (
+                  <li key={name} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                    <span className={`font-medium ${!enabled ? 'text-muted' : ''}`}>{ADDON_LABELS[name]}</span>
                     <Badge tone={enabled ? 'success' : 'neutral'}>{enabled ? 'On' : 'Off'}</Badge>
-                  ) : (
-                    <Toggle
-                      checked={enabled}
-                      disabled={!cfg.live || setAddon.isPending}
-                      onChange={(on) =>
-                        cfg.live &&
-                        setAddon.mutate({ clientId: activeClientId, addonName: name, enabled: on, monthlyPrice: cfg.price })
-                      }
-                    />
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-
-          <div className="border-t border-line px-4 py-4">
-            <div className="flex items-center justify-between text-sm font-semibold">
-              <span>Monthly total</span>
-              <span>{fmtMoney(planPrice + addonTotal)}/mo</span>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="border-t border-line px-4 py-4">
+              <p className="text-sm text-muted">This is a complimentary account. Add-ons are managed directly by Torem.</p>
             </div>
+          </Card>
+        ) : (
+          <Card
+            title="Add-ons"
+            subtitle={isActive ? 'Features active on your plan' : 'Select which features to include'}
+          >
+            <ul className="divide-y divide-line">
+              {Object.keys(ADDON_CONFIG).map((name) => {
+                const cfg = ADDON_CONFIG[name];
+                const row = addons.find((a) => a.addon_name === name);
+                const enabled = !!row?.enabled;
 
-            {!isActive && (
-              <div className="mt-3">
-                <button className="btn-primary w-full" onClick={subscribe} disabled={busy}>
-                  {busy && <Spinner className="border-white/40 border-t-white" />}
-                  Subscribe
-                </button>
-                {subError && (
-                  <p className="mt-2 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{subError}</p>
-                )}
+                return (
+                  <li key={name} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                    <div>
+                      <span className={`font-medium ${!cfg.live ? 'text-muted' : ''}`}>
+                        {ADDON_LABELS[name]}
+                      </span>
+                      {!cfg.live && (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-medium text-muted">
+                          Coming soon
+                        </span>
+                      )}
+                      <p className="text-xs text-muted">+{fmtMoney(cfg.price)}/mo</p>
+                    </div>
+                    {isActive ? (
+                      <Badge tone={enabled ? 'success' : 'neutral'}>{enabled ? 'On' : 'Off'}</Badge>
+                    ) : (
+                      <Toggle
+                        checked={enabled}
+                        disabled={!cfg.live || setAddon.isPending}
+                        onChange={(on) =>
+                          cfg.live &&
+                          setAddon.mutate({ clientId: activeClientId, addonName: name, enabled: on, monthlyPrice: cfg.price })
+                        }
+                      />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="border-t border-line px-4 py-4">
+              <div className="flex items-center justify-between text-sm font-semibold">
+                <span>Monthly total</span>
+                <span>{fmtMoney(planPrice + addonTotal)}/mo</span>
               </div>
-            )}
 
-            {isActive && (
-              <div className="mt-3">
-                <button className="btn-secondary w-full" onClick={openPortal} disabled={portalBusy}>
-                  {portalBusy && <Spinner className="h-4 w-4" />}
-                  Manage Billing
-                </button>
-                {portalError && (
-                  <p className="mt-2 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{portalError}</p>
-                )}
-              </div>
-            )}
-          </div>
-        </Card>
+              {!isActive && (
+                <div className="mt-3">
+                  <button className="btn-primary w-full" onClick={subscribe} disabled={busy}>
+                    {busy && <Spinner className="border-white/40 border-t-white" />}
+                    Subscribe
+                  </button>
+                  {subError && (
+                    <p className="mt-2 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{subError}</p>
+                  )}
+                </div>
+              )}
 
-        {isActive && (
+              {isActive && (
+                <div className="mt-3">
+                  <button className="btn-secondary w-full" onClick={openPortal} disabled={portalBusy}>
+                    {portalBusy && <Spinner className="h-4 w-4" />}
+                    Manage Billing
+                  </button>
+                  {portalError && (
+                    <p className="mt-2 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{portalError}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {(isActive || isExempt) && (
           <Card title="Want to add something?" subtitle="Tell us what you need and we will set it up for you.">
             <div className="px-4 pt-4">
               <p className="label mb-1">Anything specific we should know? <span className="text-muted font-normal">(optional)</span></p>
