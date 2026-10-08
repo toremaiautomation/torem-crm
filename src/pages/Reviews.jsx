@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, ExternalLink, Send, Star } from 'lucide-react';
 import { useAuth } from '../auth/context';
-import { useAddons } from '../theme/context';
+import { useAddons, useTheme } from '../theme/context';
 import { useBookings, useMarkJobComplete, useReviewRequests } from '../data/queries';
 import { fmtDateTime, fmtNumber, fmtRelative, toDate } from '../lib/format';
 import { Badge, Card, Modal, PageHeader, StatCard } from '../components/ui';
@@ -36,6 +36,7 @@ function Job({ booking, children }) {
 export default function Reviews() {
   const { activeClientId } = useAuth();
   const { enabled, addons } = useAddons();
+  const { config } = useTheme();
   const bookings = useBookings(activeClientId, null);
   const reviews = useReviewRequests(activeClientId);
   const complete = useMarkJobComplete();
@@ -69,6 +70,12 @@ export default function Reviews() {
   return (
     <>
       <PageHeader title="Reviews" subtitle="Mark jobs complete and Torem asks for the review." />
+      {!config?.google_review_url && (
+        <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <span>Add your Google review link in Settings so we can send review requests.</span>
+          <Link to="/settings" className="ml-4 shrink-0 font-medium text-brand hover:underline">Go to Settings</Link>
+        </div>
+      )}
       {error && <ErrorState error={error} />}
 
       <div className="grid grid-cols-3 gap-3 sm:gap-4">

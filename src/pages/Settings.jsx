@@ -11,6 +11,21 @@ import { EmptyState, ErrorState, Skeleton, Spinner } from '../components/Feedbac
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const DEFAULT_DAY = { open: '09:00', close: '17:00' };
 
+const REVIEW_HOSTS = ['google.com', 'www.google.com', 'search.google.com', 'maps.google.com', 'g.page', 'g.co', 'maps.app.goo.gl'];
+
+function validateReviewUrl(raw) {
+  const v = raw.trim();
+  if (!v) return null;
+  try {
+    const url = new URL(v);
+    if (url.protocol !== 'https:') return 'Link must start with https://';
+    if (!REVIEW_HOSTS.includes(url.hostname)) return 'Link must be a Google review link (e.g. from google.com, g.page, or maps.app.goo.gl)';
+    return null;
+  } catch {
+    return 'Enter a valid URL starting with https://';
+  }
+}
+
 function SaveBar({ dirty, busy, onSave, onReset, saved }) {
   return (
     <div className="flex items-center justify-end gap-2 border-t border-line px-4 py-3">
@@ -134,6 +149,51 @@ export function HoursForm({ clientId, config }) {
   );
 }
 
+export function GoogleReviewForm({ clientId, config }) {
+  const update = useUpdateClientConfig();
+  const [value, setValue] = useState(config?.google_review_url ?? '');
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  useEffect(() => setValue(config?.google_review_url ?? ''), [config]);
+  const dirty = value !== (config?.google_review_url ?? '');
+  const urlError = validateReviewUrl(value);
+
+  async function handleSave() {
+    setSaveError(null);
+    try {
+      await update.mutateAsync({ clientId, patch: { google_review_url: value.trim() || null } });
+      setSaved(true);
+    } catch {
+      setSaveError('Could not save the link. Make sure it is a Google review link and try again.');
+    }
+  }
+
+  return (
+    <Card title="Google review link" subtitle="Required for automatic review requests">
+      <div className="p-4">
+        <Field label="Review link" hint={'In Google Business Profile, open "Get more reviews" and copy the link.'}>
+          <input
+            className={`input${urlError || saveError ? ' border-danger' : ''}`}
+            type="url"
+            value={value}
+            onChange={(e) => { setValue(e.target.value); setSaved(false); setSaveError(null); }}
+            placeholder="https://g.page/r/..."
+          />
+          {urlError && <p className="mt-1 text-xs text-danger">{urlError}</p>}
+          {!urlError && saveError && <p className="mt-1 text-xs text-danger">{saveError}</p>}
+        </Field>
+      </div>
+      <div className="flex items-center justify-end gap-2 border-t border-line px-4 py-3">
+        {saved && !dirty && !saveError && <span className="text-xs text-success-ink">Saved</span>}
+        <button className="btn-secondary" disabled={!dirty || update.isPending}
+          onClick={() => { setValue(config?.google_review_url ?? ''); setSaved(false); setSaveError(null); }}>Reset</button>
+        <button className="btn-primary" disabled={!dirty || !!urlError || update.isPending}
+          onClick={handleSave}>Save changes</button>
+      </div>
+    </Card>
+  );
+}
+
 export function PlanCard({ client, addons }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -253,6 +313,9 @@ export default function Settings() {
           <div className="space-y-4 lg:col-span-2">
             <BrandingForm clientId={activeClientId} config={data.config} />
             <HoursForm clientId={activeClientId} config={data.config} />
+            {(data.addons.some((a) => a.addon_name === 'review_generation' && a.enabled) || !!data.client?.billing_exempt) && (
+              <GoogleReviewForm clientId={activeClientId} config={data.config} />
+            )}
           </div>
           <div className="space-y-4">
             <PlanCard client={data.client} addons={data.addons} />
