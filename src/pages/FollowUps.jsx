@@ -28,7 +28,7 @@ export default function FollowUps() {
     const g = { pending: [], call: [], sent: [], converted: [] };
     for (const l of leads.data ?? []) {
       const s = followUpStatus(l);
-      if (s && g[s]) g[s].push(l);
+      if (s && g[s]) g[s].push(l); // 'expired' and null fall through silently
     }
     return g;
   }, [leads.data]);
