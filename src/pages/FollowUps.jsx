@@ -1,19 +1,20 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, Mail, Phone, Repeat, Send, Trophy } from 'lucide-react';
+import { Clock, Mail, Phone, PhoneCall, Repeat, Send, Trophy } from 'lucide-react';
 import { useAuth } from '../auth/context';
 import { useAddons } from '../theme/context';
 import { useLeads } from '../data/queries';
-import { leadStatus } from '../lib/analytics';
+import { followUpStatus } from '../lib/analytics';
 import { fmtDateTime, fmtNumber, fmtPercent, fmtRelative } from '../lib/format';
 import { Badge, Card, DateRangePicker, PageHeader, StatCard, Table} from '../components/ui';
 import { useDateRange } from '../lib/useDateRange';
 import { EmptyState, ErrorState, LockedFeature, Skeleton } from '../components/Feedback';
 
 const TABS = [
-  { key: 'pending', label: 'Waiting to send', tone: 'brand' },
-  { key: 'sent', label: 'Sent', tone: 'warning' },
-  { key: 'converted', label: 'Converted', tone: 'success' },
+  { key: 'pending',   label: 'Waiting to send', tone: 'brand'   },
+  { key: 'call',      label: 'Call them',        tone: 'neutral' },
+  { key: 'sent',      label: 'Sent',             tone: 'warning' },
+  { key: 'converted', label: 'Converted',        tone: 'success' },
 ];
 
 export default function FollowUps() {
@@ -24,10 +25,10 @@ export default function FollowUps() {
   const leads = useLeads(activeClientId, range);
 
   const groups = useMemo(() => {
-    const g = { pending: [], sent: [], converted: [] };
+    const g = { pending: [], call: [], sent: [], converted: [] };
     for (const l of leads.data ?? []) {
-      const s = leadStatus(l);
-      if (g[s]) g[s].push(l);
+      const s = followUpStatus(l);
+      if (s && g[s]) g[s].push(l);
     }
     return g;
   }, [leads.data]);
@@ -83,24 +84,50 @@ export default function FollowUps() {
         {leads.isPending ? (
           <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
         ) : (
-          <Table
-            rowKey={(r) => r.id}
-            rows={rows}
-            empty={<EmptyState icon={Repeat} title="Nothing here">No leads in this state for the selected range.</EmptyState>}
-            columns={[
-              { key: 'contact', header: 'Contact', render: (r) => (
-                <div className="space-y-0.5">
-                  {r.email && <p className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5 text-muted" /> {r.email}</p>}
-                  {r.phone && <p className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-muted" /> {r.phone}</p>}
-                </div>
-              ) },
-              { key: 'created_at', header: 'Lead captured', className: 'whitespace-nowrap text-muted', render: (r) => fmtRelative(r.created_at) },
-              { key: 'followed_up_at', header: 'Follow-up sent', className: 'whitespace-nowrap text-muted', render: (r) => (r.followed_up_at ? fmtDateTime(r.followed_up_at) : <Badge>Queued</Badge>) },
-              { key: 'chat', header: '', className: 'text-right', render: (r) => (
-                <Link to={`/conversations/${encodeURIComponent(r.session_ref)}`} className="text-xs font-medium text-brand hover:underline">View chat</Link>
-              ) },
-            ]}
-          />
+          <>
+            {tab === 'call' && (
+              <p className="px-4 pt-3 text-sm text-muted">
+                These visitors left a phone number only, so no email is sent. Call them while they are still interested.
+              </p>
+            )}
+            {tab === 'call' ? (
+              <Table
+                rowKey={(r) => r.id}
+                rows={rows}
+                empty={<EmptyState icon={PhoneCall} title="Nothing here">No phone-only leads in this range.</EmptyState>}
+                columns={[
+                  { key: 'phone', header: 'Phone', render: (r) => (
+                    <a href={`tel:${r.phone.replace(/\D/g, '')}`} className="flex items-center gap-1.5 font-medium text-brand hover:underline">
+                      <Phone className="h-3.5 w-3.5" /> {r.phone}
+                    </a>
+                  ) },
+                  { key: 'created_at', header: 'Lead captured', className: 'whitespace-nowrap text-muted', render: (r) => fmtRelative(r.created_at) },
+                  { key: 'chat', header: '', className: 'text-right', render: (r) => (
+                    <Link to={`/conversations/${encodeURIComponent(r.session_ref)}`} className="text-xs font-medium text-brand hover:underline">View chat</Link>
+                  ) },
+                ]}
+              />
+            ) : (
+              <Table
+                rowKey={(r) => r.id}
+                rows={rows}
+                empty={<EmptyState icon={Repeat} title="Nothing here">No leads in this state for the selected range.</EmptyState>}
+                columns={[
+                  { key: 'contact', header: 'Contact', render: (r) => (
+                    <div className="space-y-0.5">
+                      {r.email && <p className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5 text-muted" /> {r.email}</p>}
+                      {r.phone && <p className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-muted" /> {r.phone}</p>}
+                    </div>
+                  ) },
+                  { key: 'created_at', header: 'Lead captured', className: 'whitespace-nowrap text-muted', render: (r) => fmtRelative(r.created_at) },
+                  { key: 'followed_up_at', header: 'Follow-up sent', className: 'whitespace-nowrap text-muted', render: (r) => (r.followed_up_at ? fmtDateTime(r.followed_up_at) : <Badge>Queued</Badge>) },
+                  { key: 'chat', header: '', className: 'text-right', render: (r) => (
+                    <Link to={`/conversations/${encodeURIComponent(r.session_ref)}`} className="text-xs font-medium text-brand hover:underline">View chat</Link>
+                  ) },
+                ]}
+              />
+            )}
+          </>
         )}
       </Card>
     </>
