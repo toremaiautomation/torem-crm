@@ -45,9 +45,12 @@ function AgencyTable({ clients, conversations, leads, bookings }) {
   );
 }
 
-function ResultTile({ label, value, delta, formatter = fmtNumber, caption, icon: Icon }) {
-  const trend = delta !== 0 ? { up: delta > 0, label: delta > 0 ? `+${formatter(delta)}` : formatter(delta) } : undefined;
-  const hint = caption != null ? caption : (delta === 0 ? 'No change' : 'vs prior period');
+function ResultTile({ label, value, cur, prev, delta, formatter = fmtNumber, caption, icon: Icon }) {
+  const isNew = prev === 0 && cur > 0;
+  const trend = isNew
+    ? { up: true, label: 'New' }
+    : delta !== 0 ? { up: delta > 0, label: delta > 0 ? `+${formatter(delta)}` : formatter(delta) } : undefined;
+  const hint = caption != null ? caption : (delta === 0 ? 'No change' : undefined);
   return <StatCard label={label} value={value} icon={Icon} trend={trend} hint={hint} />;
 }
 
@@ -99,11 +102,11 @@ export default function Dashboard() {
     const prevAfterHours = prevConvs.filter((c) => isAfterHours(c.first_at)).length;
 
     return {
-      leads: { cur: curLeads, delta: curLeads - prevLeadsData.length },
-      bookings: { cur: curBookings, delta: curBookings - prevBookingCount },
-      afterHours: { cur: curAfterHours, delta: curAfterHours - prevAfterHours },
+      leads: { cur: curLeads, prev: prevLeadsData.length, delta: curLeads - prevLeadsData.length },
+      bookings: { cur: curBookings, prev: prevBookingCount, delta: curBookings - prevBookingCount },
+      afterHours: { cur: curAfterHours, prev: prevAfterHours, delta: curAfterHours - prevAfterHours },
       estimated: avgJobValue != null
-        ? { cur: curBookings * avgJobValue, delta: (curBookings - prevBookingCount) * avgJobValue, avgJobValue }
+        ? { cur: curBookings * avgJobValue, prev: prevBookingCount * avgJobValue, delta: (curBookings - prevBookingCount) * avgJobValue, avgJobValue }
         : null,
     };
   }, [stripLoading, model, prevMessages.data, prevLeads.data, prevBookings.data, client.data]);
@@ -121,50 +124,58 @@ export default function Dashboard() {
       {error && <ErrorState error={error} retry={() => [messages, leads, bookings, reviews].forEach((q) => q.refetch())} />}
 
       {activeClientId && (
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          {stripLoading || !strip ? (
-            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24" />)
-          ) : strip.leads.cur === 0 && strip.bookings.cur === 0 && strip.afterHours.cur === 0 && !strip.estimated ? (
-            <p className="col-span-2 py-6 text-center text-sm text-muted lg:col-span-4">
-              No activity yet in this period — conversations will appear here as your assistant starts chatting.
-            </p>
-          ) : (
-            <>
-              <ResultTile label="Leads captured" value={fmtNumber(strip.leads.cur)} delta={strip.leads.delta} icon={Users} />
-              <ResultTile label="Bookings" value={fmtNumber(strip.bookings.cur)} delta={strip.bookings.delta} icon={CalendarCheck} />
-              <ResultTile label="After-hours" value={fmtNumber(strip.afterHours.cur)} delta={strip.afterHours.delta} icon={Moon} />
-              {strip.estimated ? (
-                <ResultTile
-                  label="Estimated"
-                  value={fmtMoney(strip.estimated.cur)}
-                  delta={strip.estimated.delta}
-                  formatter={fmtMoney}
-                  caption={`${strip.bookings.cur} booking${strip.bookings.cur !== 1 ? 's' : ''} × ${fmtMoney(strip.estimated.avgJobValue)}`}
-                  icon={DollarSign}
-                />
-              ) : (
-                <Link to="/settings" className="stat-card-glass">
-                  <p className="stat-card-label">Estimated</p>
-                  <p className="stat-card-num text-muted">—</p>
-                  <p className="stat-card-sub mt-1 text-brand hover:underline">Add your average job value</p>
-                </Link>
-              )}
-            </>
-          )}
-        </div>
+        <>
+          <p className="mb-2 text-xs text-muted">Compared with the previous {days} days</p>
+          <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+            {stripLoading || !strip ? (
+              Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24" />)
+            ) : strip.leads.cur === 0 && strip.bookings.cur === 0 && strip.afterHours.cur === 0 && !strip.estimated ? (
+              <p className="col-span-2 py-6 text-center text-sm text-muted lg:col-span-4">
+                No activity yet in this period — conversations will appear here as your assistant starts chatting.
+              </p>
+            ) : (
+              <>
+                <ResultTile label="Leads captured" value={fmtNumber(strip.leads.cur)} cur={strip.leads.cur} prev={strip.leads.prev} delta={strip.leads.delta}
+                  caption={`${fmtPercent(model.stats.captureRate)} of conversations`} icon={Users} />
+                <ResultTile label="Bookings" value={fmtNumber(strip.bookings.cur)} cur={strip.bookings.cur} prev={strip.bookings.prev} delta={strip.bookings.delta}
+                  caption={`${fmtPercent(model.stats.bookingRate)} of leads`} icon={CalendarCheck} />
+                <ResultTile label="After-hours chats answered" value={fmtNumber(strip.afterHours.cur)} cur={strip.afterHours.cur} prev={strip.afterHours.prev} delta={strip.afterHours.delta}
+                  caption={`${fmtPercent(model.stats.afterHoursPct)} of chats`} icon={Moon} />
+                {strip.estimated ? (
+                  <ResultTile
+                    label="Estimated"
+                    value={fmtMoney(strip.estimated.cur)}
+                    cur={strip.estimated.cur}
+                    prev={strip.estimated.prev}
+                    delta={strip.estimated.delta}
+                    formatter={fmtMoney}
+                    caption={`${strip.bookings.cur} booking${strip.bookings.cur !== 1 ? 's' : ''} × ${fmtMoney(strip.estimated.avgJobValue)}`}
+                    icon={DollarSign}
+                  />
+                ) : (
+                  <Link to="/settings" className="stat-card-glass">
+                    <p className="stat-card-label">Estimated</p>
+                    <p className="stat-card-num text-muted">—</p>
+                    <p className="stat-card-sub mt-1 text-brand hover:underline">Add your average job value</p>
+                  </Link>
+                )}
+              </>
+            )}
+          </div>
+        </>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6">
+      <div className={`grid gap-3 sm:gap-4 ${isAdmin && !activeClientId ? 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-6' : 'grid-cols-1 sm:grid-cols-3'}`}>
         {loading || !model ? (
-          Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-24" />)
+          Array.from({ length: isAdmin && !activeClientId ? 6 : 3 }).map((_, i) => <Skeleton key={i} className="h-24" />)
         ) : (
           <>
             <Reveal delay={0}><StatCard label="Conversations" value={fmtNumber(model.stats.conversations)} hint={`${fmtNumber(model.stats.messages)} messages`} icon={MessageSquare} /></Reveal>
-            <Reveal delay={70}><StatCard label="Leads captured" value={fmtNumber(model.stats.leads)} hint="of conversations" icon={Users} tone="success" trend={{ label: fmtPercent(model.stats.captureRate), up: true }} /></Reveal>
-            <Reveal delay={140}><StatCard label="Bookings" value={fmtNumber(model.stats.bookings)} hint="of leads" icon={CalendarCheck} tone="navy" trend={{ label: fmtPercent(model.stats.bookingRate), up: true }} /></Reveal>
-            <Reveal delay={210}><StatCard label="Follow-ups sent" value={fmtNumber(model.stats.followUpsSent)} hint={`${fmtNumber(model.stats.followUpsPending)} pending`} icon={Repeat} tone="warning" /></Reveal>
-            <Reveal delay={280}><StatCard label="Reviews requested" value={fmtNumber(model.stats.reviewsRequested)} hint={`${fmtNumber(model.stats.reviewsSent)} sent`} icon={Star} /></Reveal>
-            <Reveal delay={350}><StatCard label="After hours" value={fmtPercent(model.stats.afterHoursPct)} hint="outside 8am–6pm" icon={Moon} tone="neutral" /></Reveal>
+            {isAdmin && !activeClientId && <Reveal delay={70}><StatCard label="Leads captured" value={fmtNumber(model.stats.leads)} hint="of conversations" icon={Users} tone="success" trend={{ label: fmtPercent(model.stats.captureRate), up: true }} /></Reveal>}
+            {isAdmin && !activeClientId && <Reveal delay={140}><StatCard label="Bookings" value={fmtNumber(model.stats.bookings)} hint="of leads" icon={CalendarCheck} tone="navy" trend={{ label: fmtPercent(model.stats.bookingRate), up: true }} /></Reveal>}
+            <Reveal delay={isAdmin && !activeClientId ? 210 : 70}><StatCard label="Follow-ups sent" value={fmtNumber(model.stats.followUpsSent)} hint={`${fmtNumber(model.stats.followUpsPending)} pending`} icon={Repeat} tone="warning" /></Reveal>
+            <Reveal delay={isAdmin && !activeClientId ? 280 : 140}><StatCard label="Reviews requested" value={fmtNumber(model.stats.reviewsRequested)} hint={`${fmtNumber(model.stats.reviewsSent)} sent`} icon={Star} /></Reveal>
+            {isAdmin && !activeClientId && <Reveal delay={350}><StatCard label="After hours" value={fmtPercent(model.stats.afterHoursPct)} hint="outside 8am–6pm" icon={Moon} tone="neutral" /></Reveal>}
           </>
         )}
       </div>
