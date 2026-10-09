@@ -4,7 +4,7 @@ import { Clock, Mail, Phone, Repeat, Send, Trophy } from 'lucide-react';
 import { useAuth } from '../auth/context';
 import { useAddons } from '../theme/context';
 import { useLeads } from '../data/queries';
-import { leadStatus } from '../lib/analytics';
+import { followUpStatus } from '../lib/analytics';
 import { fmtDateTime, fmtNumber, fmtPercent, fmtRelative } from '../lib/format';
 import { Badge, Card, DateRangePicker, PageHeader, StatCard, Table} from '../components/ui';
 import { useDateRange } from '../lib/useDateRange';
@@ -26,8 +26,8 @@ export default function FollowUps() {
   const groups = useMemo(() => {
     const g = { pending: [], sent: [], converted: [] };
     for (const l of leads.data ?? []) {
-      const s = leadStatus(l);
-      if (g[s]) g[s].push(l);
+      const s = followUpStatus(l);
+      if (g[s]) g[s].push(l); // 'call', 'expired', and null fall through silently
     }
     return g;
   }, [leads.data]);

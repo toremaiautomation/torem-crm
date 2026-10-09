@@ -268,6 +268,32 @@ export function buildSeed() {
     });
   }
 
+  // Expired by age: created 5 days ago, past the 3-day sender window.
+  leads.push({
+    id: 'eeeeeeee-eeee-4eee-8eee-000000000001',
+    client_id: '11111111-1111-4111-8111-111111111111',
+    session_ref: 'eeeeeeee-eeee-4eee-8eee-000000000002',
+    email: 'old.lead@gmail.com',
+    phone: null,
+    booking_completed: false,
+    followed_up_at: null,
+    followup_attempts: 0,
+    created_at: subDays(new Date(), 5).toISOString(),
+  });
+
+  // Expired by attempts: hit the 3-attempt cap, created 1 day ago (still in window).
+  leads.push({
+    id: 'eeeeeeee-eeee-4eee-8eee-000000000003',
+    client_id: '11111111-1111-4111-8111-111111111111',
+    session_ref: 'eeeeeeee-eeee-4eee-8eee-000000000004',
+    email: 'maxed.out@gmail.com',
+    phone: null,
+    booking_completed: false,
+    followed_up_at: null,
+    followup_attempts: 3,
+    created_at: subDays(new Date(), 1).toISOString(),
+  });
+
   chat_sessions.sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
   return { clients, client_config, client_addons, chat_sessions, leads, bookings, review_requests, integrations };
 }
