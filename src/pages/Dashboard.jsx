@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { subDays } from 'date-fns';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { CalendarCheck, MessageSquare, Moon, Repeat, Star, Users } from 'lucide-react';
+import { CalendarCheck, DollarSign, MessageSquare, Moon, Repeat, Star, Users } from 'lucide-react';
 import { useAuth } from '../auth/context';
 import { useTheme } from '../theme/context';
-import { useBookings, useClients, useLeads, useMessages, useReviewRequests } from '../data/queries';
-import { attachRelations, computeStats, groupConversations, hourHistogram, perDaySeries, perWeekSeries } from '../lib/analytics';
-import { fmtNumber, fmtPercent, fmtRelative, labelFor, PLAN_LABELS } from '../lib/format';
+import { useBookings, useClient, useClients, useLeads, useMessages, useReviewRequests } from '../data/queries';
+import { attachRelations, computeStats, groupConversations, hourHistogram, isAfterHours, perDaySeries, perWeekSeries } from '../lib/analytics';
+import { fmtMoney, fmtNumber, fmtPercent, fmtRelative, labelFor, PLAN_LABELS } from '../lib/format';
 import { Badge, Card, DateRangePicker, PageHeader, StatCard, Table} from '../components/ui';
 import { useDateRange } from '../lib/useDateRange';
 import { EmptyState, ErrorState, Reveal, Skeleton } from '../components/Feedback';
@@ -44,19 +45,32 @@ function AgencyTable({ clients, conversations, leads, bookings }) {
   );
 }
 
+function ResultTile({ label, value, delta, formatter = fmtNumber, caption, icon: Icon }) {
+  const trend = delta !== 0 ? { up: delta > 0, label: delta > 0 ? `+${formatter(delta)}` : formatter(delta) } : undefined;
+  const hint = caption != null ? caption : (delta === 0 ? 'No change' : 'vs prior period');
+  return <StatCard label={label} value={value} icon={Icon} trend={trend} hint={hint} />;
+}
+
 export default function Dashboard() {
   const { activeClientId, isAdmin } = useAuth();
   const { brand } = useTheme();
   const { range, days, setDays } = useDateRange(30);
+
+  const prevRange = { from: subDays(range.from, days), to: subDays(range.to, days) };
 
   const messages = useMessages(activeClientId, range);
   const leads = useLeads(activeClientId, range);
   const bookings = useBookings(activeClientId, range, 'created_at');
   const reviews = useReviewRequests(activeClientId);
   const clients = useClients(isAdmin && !activeClientId);
+  const client = useClient(activeClientId);
+  const prevMessages = useMessages(activeClientId, prevRange);
+  const prevLeads = useLeads(activeClientId, prevRange);
+  const prevBookings = useBookings(activeClientId, prevRange, 'created_at');
 
   const loading = messages.isPending || leads.isPending || bookings.isPending || reviews.isPending;
   const error = messages.error || leads.error || bookings.error || reviews.error;
+  const stripLoading = loading || prevMessages.isPending || prevLeads.isPending || prevBookings.isPending || client.isPending;
 
   const model = useMemo(() => {
     if (loading || error) return null;
@@ -72,6 +86,28 @@ export default function Dashboard() {
     };
   }, [loading, error, messages.data, leads.data, bookings.data, reviews.data, range]);
 
+  const strip = useMemo(() => {
+    if (stripLoading || !model) return null;
+    const prevConvs = groupConversations(prevMessages.data ?? []);
+    const prevLeadsData = prevLeads.data ?? [];
+    const prevBookingCount = (prevBookings.data ?? []).filter((b) => b.status !== 'cancelled').length;
+    const avgJobValue = client.data?.config?.avg_job_value ?? null;
+
+    const curLeads = model.stats.leads;
+    const curBookings = model.stats.bookings;
+    const curAfterHours = model.conversations.filter((c) => isAfterHours(c.first_at)).length;
+    const prevAfterHours = prevConvs.filter((c) => isAfterHours(c.first_at)).length;
+
+    return {
+      leads: { cur: curLeads, delta: curLeads - prevLeadsData.length },
+      bookings: { cur: curBookings, delta: curBookings - prevBookingCount },
+      afterHours: { cur: curAfterHours, delta: curAfterHours - prevAfterHours },
+      estimated: avgJobValue != null
+        ? { cur: curBookings * avgJobValue, delta: (curBookings - prevBookingCount) * avgJobValue, avgJobValue }
+        : null,
+    };
+  }, [stripLoading, model, prevMessages.data, prevLeads.data, prevBookings.data, client.data]);
+
   const title = isAdmin && !activeClientId ? 'Agency overview' : `${brand.name} dashboard`;
 
   return (
@@ -83,6 +119,40 @@ export default function Dashboard() {
       />
 
       {error && <ErrorState error={error} retry={() => [messages, leads, bookings, reviews].forEach((q) => q.refetch())} />}
+
+      {activeClientId && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          {stripLoading || !strip ? (
+            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24" />)
+          ) : strip.leads.cur === 0 && strip.bookings.cur === 0 && strip.afterHours.cur === 0 && !strip.estimated ? (
+            <p className="col-span-2 py-6 text-center text-sm text-muted lg:col-span-4">
+              No activity yet in this period — conversations will appear here as your assistant starts chatting.
+            </p>
+          ) : (
+            <>
+              <ResultTile label="Leads captured" value={fmtNumber(strip.leads.cur)} delta={strip.leads.delta} icon={Users} />
+              <ResultTile label="Bookings" value={fmtNumber(strip.bookings.cur)} delta={strip.bookings.delta} icon={CalendarCheck} />
+              <ResultTile label="After-hours" value={fmtNumber(strip.afterHours.cur)} delta={strip.afterHours.delta} icon={Moon} />
+              {strip.estimated ? (
+                <ResultTile
+                  label="Estimated"
+                  value={fmtMoney(strip.estimated.cur)}
+                  delta={strip.estimated.delta}
+                  formatter={fmtMoney}
+                  caption={`${strip.bookings.cur} booking${strip.bookings.cur !== 1 ? 's' : ''} × ${fmtMoney(strip.estimated.avgJobValue)}`}
+                  icon={DollarSign}
+                />
+              ) : (
+                <Link to="/settings" className="stat-card-glass">
+                  <p className="stat-card-label">Estimated</p>
+                  <p className="stat-card-num text-muted">—</p>
+                  <p className="stat-card-sub mt-1 text-brand hover:underline">Add your average job value</p>
+                </Link>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6">
         {loading || !model ? (

@@ -93,6 +93,7 @@ const CLIENTS = [
     addons: ['booking', 'review_generation', 'automated_followup'],
     volume: 2.2,
     createdDaysAgo: 140,
+    avgJobValue: 4500,
   },
   {
     id: '22222222-2222-4222-8222-222222222222',
@@ -162,7 +163,7 @@ export function buildSeed() {
   const integrations = [];
 
   for (const c of CLIENTS) {
-    const { trade, addons, volume, createdDaysAgo, primary_color, logo_url, ...row } = c;
+    const { trade, addons, volume, createdDaysAgo, primary_color, logo_url, avgJobValue, ...row } = c;
     clients.push({ ...row, created_at: subDays(now, createdDaysAgo).toISOString() });
     client_config.push({
       client_id: c.id,
@@ -171,6 +172,7 @@ export function buildSeed() {
       primary_color,
       business_hours: DEFAULT_HOURS,
       booking_window_days: 30,
+      avg_job_value: avgJobValue ?? null,
       updated_at: subDays(now, 3).toISOString(),
     });
     for (const [name, price] of Object.entries(ADDON_PRICES)) {

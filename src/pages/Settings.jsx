@@ -194,6 +194,57 @@ export function GoogleReviewForm({ clientId, config }) {
   );
 }
 
+export function AvgJobValueForm({ clientId, config }) {
+  const update = useUpdateClientConfig();
+  const [value, setValue] = useState(config?.avg_job_value != null ? String(config.avg_job_value) : '');
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  useEffect(() => setValue(config?.avg_job_value != null ? String(config.avg_job_value) : ''), [config]);
+  const dirty = value !== (config?.avg_job_value != null ? String(config.avg_job_value) : '');
+  const numericValue = value === '' ? null : Number(value);
+  const inputError = value !== '' && (isNaN(numericValue) || !Number.isInteger(numericValue) || numericValue < 0 || numericValue > 1000000)
+    ? 'Enter a whole dollar amount from $0 to $1,000,000'
+    : null;
+
+  async function handleSave() {
+    setSaveError(null);
+    try {
+      await update.mutateAsync({ clientId, patch: { avg_job_value: numericValue } });
+      setSaved(true);
+    } catch {
+      setSaveError('Could not save. Try again.');
+    }
+  }
+
+  return (
+    <Card title="Average job value" subtitle="Used to estimate the value of bookings on your dashboard. Never shown to your customers.">
+      <div className="p-4">
+        <Field label="Average job value ($)" hint="Leave blank to hide the estimated revenue tile on the Dashboard.">
+          <input
+            className={`input${inputError || saveError ? ' border-danger' : ''}`}
+            type="number"
+            min="0"
+            max="1000000"
+            step="1"
+            value={value}
+            onChange={(e) => { setValue(e.target.value); setSaved(false); setSaveError(null); }}
+            placeholder="e.g. 4500"
+          />
+          {inputError && <p className="mt-1 text-xs text-danger">{inputError}</p>}
+          {!inputError && saveError && <p className="mt-1 text-xs text-danger">{saveError}</p>}
+        </Field>
+      </div>
+      <div className="flex items-center justify-end gap-2 border-t border-line px-4 py-3">
+        {saved && !dirty && !saveError && <span className="text-xs text-success-ink">Saved</span>}
+        <button className="btn-secondary" disabled={!dirty || update.isPending}
+          onClick={() => { setValue(config?.avg_job_value != null ? String(config.avg_job_value) : ''); setSaved(false); setSaveError(null); }}>Reset</button>
+        <button className="btn-primary" disabled={!dirty || !!inputError || update.isPending}
+          onClick={handleSave}>Save changes</button>
+      </div>
+    </Card>
+  );
+}
+
 export function PlanCard({ client, addons }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -313,6 +364,7 @@ export default function Settings() {
           <div className="space-y-4 lg:col-span-2">
             <BrandingForm clientId={activeClientId} config={data.config} />
             <HoursForm clientId={activeClientId} config={data.config} />
+            <AvgJobValueForm clientId={activeClientId} config={data.config} />
             {(data.addons.some((a) => a.addon_name === 'review_generation' && a.enabled) || !!data.client?.billing_exempt) && (
               <GoogleReviewForm clientId={activeClientId} config={data.config} />
             )}
