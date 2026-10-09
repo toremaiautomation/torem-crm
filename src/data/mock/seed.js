@@ -274,6 +274,18 @@ export function buildSeed() {
     });
   }
 
+  // One deterministic phone-only lead so the "Call them" tab is always populated.
+  leads.push({
+    id: 'ffffffff-ffff-4fff-8fff-000000000001',
+    client_id: '11111111-1111-4111-8111-111111111111',
+    session_ref: 'ffffffff-ffff-4fff-8fff-000000000002',
+    email: null,
+    phone: '(713) 555-0147',
+    booking_completed: false,
+    followed_up_at: null,
+    created_at: subDays(new Date(), 3).toISOString(),
+  });
+
   chat_sessions.sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
   return { clients, client_config, client_addons, chat_sessions, leads, bookings, review_requests, integrations };
 }

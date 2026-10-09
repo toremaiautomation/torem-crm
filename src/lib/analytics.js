@@ -59,7 +59,7 @@ export function computeStats({ conversations, leads, bookings, reviews }) {
     bookings: bookingCount,
     bookingRate: leadCount ? bookingCount / leadCount : 0,
     followUpsSent,
-    followUpsPending: leads.filter((l) => !l.followed_up_at && !l.booking_completed && (l.email || l.phone)).length,
+    followUpsPending: leads.filter((l) => !l.followed_up_at && !l.booking_completed && l.email).length,
     reviewsRequested: reviews.length,
     reviewsSent: reviews.filter((r) => r.review_sent_at).length,
     afterHoursPct: convCount ? afterHours / convCount : 0,
@@ -106,4 +106,15 @@ export function leadStatus(lead) {
   if (lead.followed_up_at) return 'sent';
   if (lead.email || lead.phone) return 'pending';
   return 'no_contact';
+}
+
+// Used only by the Follow-ups page and the dashboard pending count.
+// Unlike leadStatus, phone-only leads get their own 'call' state so they
+// are never shown as "Waiting to send" (the emailer will never reach them).
+export function followUpStatus(lead) {
+  if (lead.booking_completed) return 'converted';
+  if (lead.followed_up_at) return 'sent';
+  if (lead.email) return 'pending';
+  if (lead.phone) return 'call';
+  return null; // no contact info — hidden
 }
