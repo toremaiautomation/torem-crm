@@ -27,6 +27,9 @@ export const useReviewRequests = (clientId) =>
 export const useIntegrations = (clientId) =>
   useQuery({ queryKey: ['integrations', clientId ?? 'all'], queryFn: () => api.listIntegrations(clientId), enabled: !!clientId });
 
+export const useAddonCatalog = () =>
+  useQuery({ queryKey: ['addonCatalog'], queryFn: api.listAddonCatalog, staleTime: 5 * 60 * 1000 });
+
 function useInvalidating(fn, keys) {
   const qc = useQueryClient();
   return useMutation({
