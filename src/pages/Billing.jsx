@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../auth/context';
-import { useClient, useSetAddon } from '../data/queries';
+import { useAddonCatalog, useClient, useSetAddon } from '../data/queries';
 import { supabase } from '../lib/supabase';
 import { ADDON_LABELS, fmtMoney, labelFor, PLAN_LABELS } from '../lib/format';
 import { Badge, Card, PageHeader, Toggle } from '../components/ui';
@@ -11,26 +11,23 @@ const ADDON_REQUEST_WEBHOOK = import.meta.env.VITE_N8N_ADDON_REQUEST_WEBHOOK;
 
 const PLAN_PRICE = { foundation: 40, growth: 0, full_stack: 0 };
 
-const ADDON_CONFIG = {
-  booking:            { price: 20, live: true },
-  review_generation:  { price: 10, live: false },
-  automated_followup: { price: 15, live: false },
-};
-
 const BILLING_BADGE = { active: 'success', pending: 'neutral', past_due: 'danger', canceled: 'danger' };
 const BILLING_LABEL = { active: 'Active', pending: 'Pending', past_due: 'Past due', canceled: 'Canceled' };
 
-const REQUEST_ROWS = [
-  { name: 'booking',            label: 'Booking Built In',    comingSoon: false },
-  { name: 'review_generation',  label: 'Review Generation',   comingSoon: true  },
-  { name: 'automated_followup', label: 'Automated Follow-Up', comingSoon: true  },
-  { name: 'custom',             label: 'Something custom',    comingSoon: false },
-];
+// Labels for the request card (includes "custom" which has no catalog entry)
+const REQUEST_LABELS = {
+  booking:            'Booking Built In',
+  review_generation:  'Review Generation',
+  automated_followup: 'Automated Follow-Up',
+  custom:             'Something custom',
+};
 
 export default function Billing() {
   const { activeClientId } = useAuth();
   const { data, isPending, error } = useClient(activeClientId);
+  const { data: catalogRows = [] } = useAddonCatalog();
   const setAddon = useSetAddon();
+  const [addonErrors, setAddonErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const [subError, setSubError] = useState(null);
   const [portalBusy, setPortalBusy] = useState(false);
@@ -47,10 +44,35 @@ export default function Billing() {
   const isActive = billingStatus === 'active';
   const isExempt = !!client.billing_exempt;
   const planPrice = PLAN_PRICE[client.plan_tier] ?? 0;
-  const addonTotal = Object.keys(ADDON_CONFIG).reduce((sum, name) => {
+
+  // catalog map: { addon_name -> { monthly_price, stripe_price_id, live } }
+  const catalog = Object.fromEntries(catalogRows.map((r) => [r.addon_name, r]));
+
+  const addonTotal = Object.keys(ADDON_LABELS).reduce((sum, name) => {
     const row = addons.find((a) => a.addon_name === name);
-    return row?.enabled ? sum + ADDON_CONFIG[name].price : sum;
+    return row?.enabled ? sum + Number(catalog[name]?.monthly_price ?? 0) : sum;
   }, 0);
+
+  // requestRows: comingSoon = addon exists in catalog and is not yet live
+  const requestRows = Object.entries(REQUEST_LABELS).map(([name, label]) => ({
+    name,
+    label,
+    comingSoon: name !== 'custom' && catalog[name] != null && !catalog[name].live,
+  }));
+
+  async function toggleAddon(name, on) {
+    setAddonErrors((prev) => ({ ...prev, [name]: null }));
+    try {
+      await setAddon.mutateAsync({
+        clientId: activeClientId,
+        addonName: name,
+        enabled: on,
+        monthlyPrice: catalog[name]?.monthly_price ?? 0,
+      });
+    } catch (e) {
+      setAddonErrors((prev) => ({ ...prev, [name]: e.message ?? 'Could not update add-on.' }));
+    }
+  }
 
   async function subscribe() {
     setBusy(true);
@@ -148,7 +170,7 @@ export default function Billing() {
         {isExempt ? (
           <Card title="Add-ons" subtitle="Enabled on your account by Torem">
             <ul className="divide-y divide-line">
-              {Object.keys(ADDON_CONFIG).map((name) => {
+              {Object.keys(ADDON_LABELS).map((name) => {
                 const row = addons.find((a) => a.addon_name === name);
                 const enabled = !!row?.enabled;
                 return (
@@ -169,34 +191,36 @@ export default function Billing() {
             subtitle={isActive ? 'Features active on your plan' : 'Select which features to include'}
           >
             <ul className="divide-y divide-line">
-              {Object.keys(ADDON_CONFIG).map((name) => {
-                const cfg = ADDON_CONFIG[name];
+              {Object.keys(ADDON_LABELS).map((name) => {
+                const cat = catalog[name];
                 const row = addons.find((a) => a.addon_name === name);
                 const enabled = !!row?.enabled;
+                const isLive = cat?.live ?? false;
+                const price = cat?.monthly_price;
 
                 return (
                   <li key={name} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
                     <div>
-                      <span className={`font-medium ${!cfg.live ? 'text-muted' : ''}`}>
+                      <span className={`font-medium ${!isLive ? 'text-muted' : ''}`}>
                         {ADDON_LABELS[name]}
                       </span>
-                      {!cfg.live && (
+                      {!isLive && (
                         <span className="ml-2 inline-flex items-center rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-medium text-muted">
                           Coming soon
                         </span>
                       )}
-                      <p className="text-xs text-muted">+{fmtMoney(cfg.price)}/mo</p>
+                      <p className="text-xs text-muted">+{fmtMoney(price)}/mo</p>
+                      {addonErrors[name] && (
+                        <p className="mt-0.5 text-xs text-danger">{addonErrors[name]}</p>
+                      )}
                     </div>
                     {isActive ? (
                       <Badge tone={enabled ? 'success' : 'neutral'}>{enabled ? 'On' : 'Off'}</Badge>
                     ) : (
                       <Toggle
                         checked={enabled}
-                        disabled={!cfg.live || setAddon.isPending}
-                        onChange={(on) =>
-                          cfg.live &&
-                          setAddon.mutate({ clientId: activeClientId, addonName: name, enabled: on, monthlyPrice: cfg.price })
-                        }
+                        disabled={!isLive || setAddon.isPending}
+                        onChange={(on) => toggleAddon(name, on)}
                       />
                     )}
                   </li>
@@ -251,7 +275,7 @@ export default function Billing() {
               <p className="mt-1 text-right text-[11px] text-muted">{note.length}/500</p>
             </div>
             <ul className="mt-2 divide-y divide-line">
-              {REQUEST_ROWS.map(({ name, label, comingSoon }) => {
+              {requestRows.map(({ name, label, comingSoon }) => {
                 const alreadyEnabled = name !== 'custom' && addons.find((a) => a.addon_name === name)?.enabled;
                 const rs = reqState[name] ?? 'idle';
                 return (

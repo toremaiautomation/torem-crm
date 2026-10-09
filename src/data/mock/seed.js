@@ -126,6 +126,12 @@ const CLIENTS = [
 
 const ADDON_PRICES = { booking: 20, review_generation: 10, automated_followup: 15 };
 
+export const MOCK_ADDON_CATALOG = [
+  { addon_name: 'booking',            monthly_price: 20, stripe_price_id: 'price_mock_booking',    live: true  },
+  { addon_name: 'review_generation',  monthly_price: 10, stripe_price_id: 'price_mock_review',     live: false },
+  { addon_name: 'automated_followup', monthly_price: 15, stripe_price_id: 'price_mock_followup',   live: false },
+];
+
 const DEFAULT_HOURS = {
   monday: { open: '08:00', close: '18:00' },
   tuesday: { open: '08:00', close: '18:00' },

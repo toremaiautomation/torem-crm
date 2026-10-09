@@ -112,6 +112,9 @@ export const supabaseApi = {
   listReviewRequests: (clientId) =>
     fetchAll(() => scoped(requireClient().from('review_requests').select('*'), clientId).order('marked_complete_at', { ascending: false })),
 
+  listAddonCatalog: () =>
+    fetchAll(() => requireClient().from('addon_catalog').select('addon_name, monthly_price, stripe_price_id, live').order('addon_name')),
+
   listIntegrations: (clientId) =>
     fetchAll(() => scoped(requireClient().from('client_integration_status').select('*'), clientId)),
 

@@ -1,4 +1,4 @@
-import { buildSeed, MOCK_USERS } from './seed';
+import { buildSeed, MOCK_ADDON_CATALOG, MOCK_USERS } from './seed';
 
 const db = buildSeed();
 const SESSION_KEY = 'torem-crm-mock-session';
@@ -132,6 +132,11 @@ export const mockApi = {
   async listReviewRequests(clientId) {
     await delay();
     return clone(byClient(db.review_requests, clientId).sort((a, b) => (a.marked_complete_at < b.marked_complete_at ? 1 : -1)));
+  },
+
+  async listAddonCatalog() {
+    await delay(60);
+    return clone(MOCK_ADDON_CATALOG);
   },
 
   async listIntegrations(clientId) {
