@@ -59,7 +59,7 @@ export function computeStats({ conversations, leads, bookings, reviews }) {
     bookings: bookingCount,
     bookingRate: leadCount ? bookingCount / leadCount : 0,
     followUpsSent,
-    followUpsPending: leads.filter((l) => !l.followed_up_at && !l.booking_completed && l.email).length,
+    followUpsPending: leads.filter((l) => followUpStatus(l) === 'pending').length,
     reviewsRequested: reviews.length,
     reviewsSent: reviews.filter((r) => r.review_sent_at).length,
     afterHoursPct: convCount ? afterHours / convCount : 0,
@@ -108,13 +108,23 @@ export function leadStatus(lead) {
   return 'no_contact';
 }
 
+// Keep in sync with claim_followup_leads in the database.
+export const FOLLOWUP_WINDOW_DAYS = 3;
+export const FOLLOWUP_MAX_ATTEMPTS = 3;
+
 // Used only by the Follow-ups page and the dashboard pending count.
 // Unlike leadStatus, phone-only leads get their own 'call' state so they
 // are never shown as "Waiting to send" (the emailer will never reach them).
 export function followUpStatus(lead) {
   if (lead.booking_completed) return 'converted';
   if (lead.followed_up_at) return 'sent';
-  if (lead.email) return 'pending';
-  if (lead.phone) return 'call';
-  return null; // no contact info — hidden
+  if (lead.phone && !lead.email) return 'call'; // never expires — emailer never touches these
+  if (lead.email) {
+    const windowMs = FOLLOWUP_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    const expired =
+      Date.now() - new Date(lead.created_at).getTime() > windowMs ||
+      (lead.followup_attempts ?? 0) >= FOLLOWUP_MAX_ATTEMPTS;
+    return expired ? 'expired' : 'pending';
+  }
+  return null; // no phone and no email — hidden
 }
