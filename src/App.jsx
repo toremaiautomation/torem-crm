@@ -24,14 +24,29 @@ function AuthLinkHandler() {
   const navigate = useNavigate();
   useEffect(() => {
     const hash = new URLSearchParams(window.location.hash.slice(1));
+    const query = new URLSearchParams(window.location.search);
     const type = hash.get('type');
-    if (type === 'invite' || type === 'recovery' || type === 'magiclink') {
+
+    if (type === 'invite' || type === 'recovery') {
       navigate('/reset-password', { replace: true, state: { type } });
-    } else if (hash.get('error')) {
-      const message = hash.get('error_description') ?? 'This sign-in link is no longer valid.';
+    } else if (type === 'magiclink') {
+      // SDK has already parsed the access token; clean the URL so the token isn't bookmarkable.
       window.history.replaceState(null, '', window.location.pathname);
-      navigate('/login', { replace: true, state: { authError: message } });
+    } else {
+      const hashError = hash.get('error') || hash.get('error_code');
+      const queryError = query.get('error') || query.get('error_code');
+      if (hashError || queryError) {
+        const isExpired =
+          hash.get('error') === 'access_denied' || hash.get('error_code') === 'otp_expired' ||
+          query.get('error') === 'access_denied' || query.get('error_code') === 'otp_expired';
+        const message = isExpired
+          ? 'That link has expired or was already used. Request a new one.'
+          : (hash.get('error_description') || query.get('error_description') || 'This sign-in link is no longer valid.');
+        window.history.replaceState(null, '', window.location.pathname);
+        navigate('/login', { replace: true, state: { authError: message } });
+      }
     }
+
     return api.auth.onAuthStateChange((_session, event) => {
       if (event === 'PASSWORD_RECOVERY') navigate('/reset-password', { replace: true, state: { type: 'recovery' } });
     });
