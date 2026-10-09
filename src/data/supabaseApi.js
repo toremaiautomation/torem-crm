@@ -45,7 +45,7 @@ export const supabaseApi = {
     },
     signInWithPassword: (email, password) => requireClient().auth.signInWithPassword({ email, password }),
     signInWithOtp: (email) =>
-      requireClient().auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } }),
+      requireClient().auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin, shouldCreateUser: false } }),
     resetPassword: (email) =>
       requireClient().auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` }),
     updatePassword: (password) => requireClient().auth.updateUser({ password }),
